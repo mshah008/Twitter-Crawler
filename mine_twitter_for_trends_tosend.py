@@ -11,6 +11,7 @@ import simplejson as json
 import logging
 import sqlalchemy
 
+
 """
 A multi-process crawler for twitter. It creates 50 processes that are used to
 query twitter. Postgresql database is used to store the data. Elixir

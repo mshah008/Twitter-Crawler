@@ -2,6 +2,7 @@ import twitter
 import json
 import elixir
 
+
 class UserAttr(elixir.Entity):
     #idnum = elixir.Field(elixir.Integer, primary_key=True)
     uname = elixir.Field(elixir.String(1000), primary_key=True)
