@@ -10,8 +10,7 @@ import elixir
 import simplejson as json
 import logging
 import sqlalchemy
-
-
+import sys
 """
 A multi-process crawler for twitter. It creates 50 processes that are used to
 query twitter. Postgresql database is used to store the data. Elixir
@@ -21,7 +20,31 @@ the results from the result queue and writes them in the database. The 50 worker
 processes have the simple duty of reading the new requests from the request
 queue, fetching them from twitter, and putting the result in the result queue.
 
+The program writes to and reads from a database called twitter_crawl. The table
+fields and type of fields have been defined in the file model.py (to separate
+data model from the code).
+
+The program in its current state gets its seedsfrom the command
+line. The seeds (the starting twitter accounts that the crwls starts from) are
+passed to the function multiprocess_mine as a list of strings.
+
+The program can be called by running:
+python mine_twitter_for_trends_tosend.py
+To be able to run the program, you need to have a postgresql with the
+appropriate access for user mol up and running. 
+
+The following variables should also be initialized by a valid twitter account
+authentication information, in order to be able to run the program.
+user = "a valide username should go here"
+
 """
+user = "valid user name"
+passwd = "the passwd of the account"
+words = ['test', "security"]
+consumer_key = "consumer key"
+consumer_secret = "consumer secret"
+access_token = "access token"
+access_token_secret = "access token secret" #consumer key, consumer key
 
 MAX_THREAD_NUM=100
 PROCESS_NUM=50
@@ -44,12 +67,12 @@ class myLogging():
 def initiate_elixir():
     #elixir.metadata.bind = "mysql://root:mysqlp@ss@localhost/twitter_crawl"
     #elixir.metadata.bind = "sqlite:///twitter_crawl.sqlite"
-    elixir.metadata.bind = "postgresql://ali:postgresp@ss@localhost/twitter_crawl"
+    elixir.metadata.bind = "postgresql://mol:postgrespass@localhost/twitter_crawl"
     elixir.setup_all()
     elixir.create_all()
 
 def renew_elixir_session():
-    elixir.metadata.bind = "postgresql://ali:postgresp@ss@localhost/twitter_crawl"
+    elixir.metadata.bind = "postgresql://mol:postgrespass@localhost/twitter_crawl"
     elixir.session = sqlalchemy.orm.scoped_session(sqlalchemy.orm.sessionmaker())
 #def connect_to_db():
 #    conn = MySQLdb.connect (host = "localhost", user="root", passwd="mysqlp@ss", db="netsa")
@@ -117,7 +140,7 @@ def multiprocess_mine(seeds):
         
         from model import *
         initiate_elixir()
-        for uname in seeds:
+        for uname in seeds:#put the seeds on the request queue
             #idnum = getidnum(uname)
             print UserAttr.query.filter_by(uname=uname).count()
             if UserAttr.query.filter_by(uname=uname).count() == 0:
@@ -138,7 +161,7 @@ def multiprocess_mine(seeds):
 
         elixir.session.commit()
         while users_done_num < MAX_NODE_NUM:
-            res = qres.get()
+            res = qres.get()# get the result
             #uname = res.keys()[0]
             #item = res.values()[0]
             #user = UserAttr.query.filter_by(uname=uname).one()
@@ -172,8 +195,9 @@ def multiprocess_mine(seeds):
                         #qreq.put(x)
             #elixir.session.commit()
             if qreq.qsize() < PROCESS_NUM:
+                #get users not requested yet from db
                 new_reqset = UserAttr.query.filter_by(requested=False).slice(1, 10 * PROCESS_NUM)
-                for new_req in new_reqset:
+                for new_req in new_reqset:#put them on the request queue
                     new_req.requested = True
                     qreq.put(new_req.uname)
                     mylogger.log("put %s" % new_req.uname)
@@ -198,7 +222,7 @@ def worker(qreq, qres, fq, logq, dblock):
         initiate_elixir()
         mylogger.log("in worker")
         while True:
-            uname = qreq.get()
+            uname = qreq.get()#pick a request
             #mylogger.log("got new req " + uname)
             if uname != "TERMINATE":
                 res = get_user_friends_and_followers(uname)
@@ -225,11 +249,14 @@ def worker(qreq, qres, fq, logq, dblock):
                     x = fr.screen_name
                     userfq = UserAttr.query.filter_by(uname=x)
                     user_found = False
+                    #has the user already been seen?
                     if userfq.count() == 1:
                         userf = userfq.one()
                         user_found = True
-                    if not user_found or userf.requested == False:
-                    #if x not in users_requested:
+                   
+                    if not user_found or userf.requested == False:#the user not
+                        #seen before or not requested before
+                        #if x not in users_requested:
                         #af.write(str(fr) + "\n")
                         #users_requested.add(x)
                         if not user_found:
@@ -251,19 +278,13 @@ def worker(qreq, qres, fq, logq, dblock):
             else:
                 qreq.task_done()
                 return
+            #put result on the result queue
             qres.put({uname:res})
             qreq.task_done()
     except Exception as e:
         mylogger.log("Error " + str(e))
 
 def get_user_friends_and_followers(uname):
-    user = "AliZand3"
-    passwd = "zandp@ss"
-    words = ['test', "security"]
-    consumer_key = "vEV8KWRBS0WXbAXonGruzg"
-    consumer_secret = "wJySs4mlcGBTqZvQgKN4Y2kHGbj8IzZE6TdLxELbxJ8"
-    access_token = "509393232-gpefGK1coYaHssRtPRvBJVtTbaOMA4Vs4OiNYQ6A"
-    access_token_secret = "gOlkvAxjwl6KdXmtVpMlLA6H8Q5bdAC0IrGg2oha3U"
     to_wait = cap_wait
     cap_got = False
     cap = 0
@@ -297,17 +318,6 @@ def get_user_friends_and_followers(uname):
     return [friends, followers]
 
 def build_user_communities(uname):
-    user = "a valide username should go here"
-    passwd = "the passwd of the account"
-    words = ['test', "security"]
-    consumer_key = "consumer key"
-    consumer_secret = "consumer secret"
-    access_token = "access token"
-    access_token_secret = "access token secret" #consumer key, consumer key
-    #secret, access token, and access token secret can be acquired from twitter
-    #oath2
-
-
     api = twitter.Api(consumer_key=consumer_key, consumer_secret=consumer_secret, access_token_key=access_token, access_token_secret=access_token_secret)
     while api.GetRateLimitStatus()["remaining_hits"] < 100:
         print uname, "out of cap"
@@ -362,6 +372,8 @@ def totuple(s):
     return tuple(sorted(list(s)))
 
 def merge_communities(cliques):
+    #two cliques can be merged into one community only if they are different
+    #only in one node
     merged = set([])
     g = igraph.Graph(0)
     nodeno = {}
@@ -399,13 +411,10 @@ def merge_communities(cliques):
     return merged
                     
 def main():
-    multiprocess_mine(["azand", "bboe"])
+    multiprocess_mine(sys.argv[1:])
+    #multiprocess_mine(["startuser1", "startuser2"])
 
 
 if __name__ == "__main__":
     main()
             
-    #filterstream = tweetstream.FilterStream(username=user, password = passwd, track=words)
-    #for tweet in filterstream:
-    #    pass
-    #filterstream.close()

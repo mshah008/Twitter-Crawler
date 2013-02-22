@@ -1,0 +1,15 @@
+This project tries to:
+1- gather information about twitter accounts and their followship connection by
+crawling twitter.
+2- detect the notion of communities among the users by building the followship
+graph and extracting cliques and merging the very similar cliques into a
+community.
+
+To crawl twitter, the program mine_twitter_for_trends_tosend.py is used. This
+program accepts as its commandline arguments, a set of twitter account names
+that will be used to seed the crawling. It should be noticed that if an account
+is not public (or is private) on twitter, its information will not be retrieved,
+because twitter does not return the connection information of private accounts.
+The model.py is the data model used by elixir library, used in
+mine_twitter_for_trends_tosend.py.
+
